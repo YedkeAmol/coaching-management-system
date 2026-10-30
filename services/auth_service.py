@@ -26,6 +26,8 @@ class AuthService:
             return False, "User not identified."
         if not new_pw or len(new_pw) < 6:
             return False, "New password must be at least 6 characters long."
+        if old_pw == new_pw:
+            return False, "New password must be different from your current password."
         
         db = get_db()
         user = db.users.find_one({"username": username})

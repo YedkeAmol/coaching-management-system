@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from database import get_db, rupees_to_paise, paise_to_rupees
+from services.validation_service import ValidationService
 
 class BatchService:
     @staticmethod
@@ -20,8 +21,18 @@ class BatchService:
 
     @staticmethod
     def create_batch(data):
-        if not data or not data.get("batch_name"):
-            return False, "Batch name is required.", None
+        if not data:
+            return False, "Batch data is required.", None
+            
+        bname = str(data.get("batch_name", "")).strip()
+        ok_n, msg_n = ValidationService.validate_name(bname, "Batch name", min_len=2)
+        if not ok_n:
+            return False, msg_n, None
+
+        monthly_fee = data.get("default_monthly_fee") or data.get("monthly_fee") or 0
+        ok_amt, msg_amt = ValidationService.validate_amount(monthly_fee, "Default monthly fee", min_val=0.0, max_val=500000.0)
+        if not ok_amt:
+            return False, msg_amt, None
         
         db = get_db()
         # Generate batch ID if not provided
@@ -41,7 +52,6 @@ class BatchService:
             if crs:
                 course_name = crs.get("course_name", "")
 
-        monthly_fee = data.get("default_monthly_fee") or data.get("monthly_fee") or 0
         fee_paise = rupees_to_paise(monthly_fee)
 
         batch_doc = {
@@ -105,8 +115,18 @@ class BatchService:
 
     @staticmethod
     def create_course(data):
-        if not data or not data.get("course_name"):
-            return False, "Course name is required.", None
+        if not data:
+            return False, "Course data is required.", None
+        
+        cname = str(data.get("course_name", "")).strip()
+        ok_n, msg_n = ValidationService.validate_name(cname, "Course title", min_len=2)
+        if not ok_n:
+            return False, msg_n, None
+
+        fee = data.get("default_fee") or data.get("fee") or 0
+        ok_amt, msg_amt = ValidationService.validate_amount(fee, "Default course fee", min_val=0.0, max_val=500000.0)
+        if not ok_amt:
+            return False, msg_amt, None
         
         db = get_db()
         course_id = data.get("course_id")
@@ -117,7 +137,6 @@ class BatchService:
                 count += 1
                 course_id = f"CRS-{count}"
 
-        fee = data.get("default_fee") or data.get("fee") or 0
         fee_paise = rupees_to_paise(fee)
 
         course_doc = {

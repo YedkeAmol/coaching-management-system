@@ -145,14 +145,16 @@
             <form id="addStudentForm" onsubmit="handleAddStudent(event)" class="space-y-3.5 text-xs">
                 <div>
                     <label class="block font-semibold text-slate-700 mb-1">Full Name *</label>
-                    <input type="text" id="stuName" required placeholder="e.g. Aarav Sharma"
+                    <input type="text" id="stuName" required minlength="2" maxlength="80" placeholder="e.g. Aarav Sharma"
                         class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Student Phone *</label>
-                        <input type="tel" id="stuPhone" required placeholder="9876543201"
-                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block font-semibold text-slate-700 mb-1">Student Phone * (10 digits)</label>
+                        <input type="tel" id="stuPhone" required maxlength="10" pattern="[6-9][0-9]{9}" placeholder="9876543201"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                        <span class="text-[10px] text-slate-400">Must start with 6, 7, 8 or 9</span>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-700 mb-1">Admission Date</label>
@@ -167,9 +169,10 @@
                             class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Parent Phone</label>
-                        <input type="tel" id="stuParentPhone" placeholder="9876543202"
-                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block font-semibold text-slate-700 mb-1">Parent Phone (Optional)</label>
+                        <input type="tel" id="stuParentPhone" maxlength="10" pattern="[6-9][0-9]{9}" placeholder="9876543202"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -180,8 +183,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Monthly Fee (₹) *</label>
-                        <input type="number" step="0.01" id="stuFee" required placeholder="1500"
+                        <label class="block font-semibold text-slate-700 mb-1">Monthly Tuition Fee (₹) *</label>
+                        <input type="number" step="0.01" min="1" max="500000" id="stuFee" required placeholder="1500"
                             class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                 </div>
@@ -191,7 +194,7 @@
                         class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <div>
-                    <label class="block font-semibold text-slate-700 mb-1">Academic Notes / Goals</label>
+                    <label class="block font-semibold text-slate-700 mb-1">Academic Notes / Target Goals</label>
                     <input type="text" id="stuNotes" placeholder="e.g. Target 95% in Board Exams"
                         class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
@@ -240,9 +243,10 @@
 
         if (res.success) {
             closeModal();
+            showToast(res.message || 'Student enrolled successfully!', 'success');
             loadStudents(1);
         } else {
-            alert('Error: ' + (res.error || 'Failed to create student'));
+            showToast(res.error || 'Failed to create student', 'error');
             btn.disabled = false;
             btn.innerText = 'Confirm Admission';
         }
@@ -252,10 +256,10 @@
         if (!confirm(`Are you sure you want to delete/archive student "${name}" (${studentId})?`)) return;
         const res = await fetchJson(`/api/students/${studentId}`, { method: 'DELETE' });
         if (res.success) {
-            alert(res.message);
+            showToast(res.message, 'success');
             loadStudents(currentPage);
         } else {
-            alert('Error: ' + res.error);
+            showToast(res.error || 'Failed to delete student', 'error');
         }
     }
 

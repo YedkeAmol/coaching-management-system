@@ -136,7 +136,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-semibold text-slate-700 mb-1">Amount to Collect (₹) *</label>
-                        <input type="number" step="0.01" min="1" id="modalAmt" required value="${balance}"
+                        <input type="number" step="0.01" min="1" max="1000000" id="modalAmt" required value="${balance}"
                             class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div>
@@ -186,7 +186,7 @@
             window.open('/receipt/' + res.data.receipt_no, '_blank');
             loadMonthlyFees();
         } else {
-            alert('Error: ' + res.error);
+            showToast(res.error || 'Failed to record fee collection.', 'error');
         }
     }
 

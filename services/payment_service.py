@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 import re
 from database import (
@@ -9,6 +9,7 @@ from database import (
     format_date_indian,
     parse_indian_date
 )
+from services.validation_service import ValidationService
 
 class PaymentService:
     @staticmethod
@@ -73,14 +74,15 @@ class PaymentService:
             return False, f"Student '{student_id}' not found.", None
 
         raw_amount = data.get("amount") or data.get("amount_rupees") or 0
+        ok_amt, msg_amt = ValidationService.validate_amount(raw_amount, "Payment amount", min_val=1.0, max_val=1000000.0)
+        if not ok_amt:
+            return False, msg_amt, None
         amount_paise = rupees_to_paise(raw_amount)
-        if amount_paise <= 0:
-            return False, "Payment amount must be greater than zero.", None
 
-        payment_method = data.get("payment_method", "Cash").strip()
+        payment_method = str(data.get("payment_method", "Cash")).strip() or "Cash"
         reference_no = str(data.get("reference_no", "")).strip()
 
-        # Duplicate payment check: prevent submitting same reference/amount within seconds
+        # Duplicate payment check by reference number
         if reference_no:
             dup = db.payments.find_one({
                 "student_id": student_id,
@@ -89,6 +91,17 @@ class PaymentService:
             })
             if dup:
                 return False, f"Payment with reference '{reference_no}' already exists.", None
+
+        # Rapid duplicate payment debounce (prevents accidental double submission within 5 seconds)
+        ten_sec_ago = datetime.now(timezone.utc) - timedelta(seconds=5)
+        recent_dup = db.payments.find_one({
+            "student_id": student_id,
+            "amount_paise": amount_paise,
+            "created_at": {"$gte": ten_sec_ago},
+            "is_reversed": {"$ne": True}
+        })
+        if recent_dup:
+            return False, "A payment for the exact same amount was just submitted. Please wait a few seconds to avoid duplicates.", None
 
         payment_date = parse_indian_date(str(data.get("payment_date", "")).strip())
         if not payment_date:
@@ -263,6 +276,9 @@ class PaymentService:
         if not payment_id:
             return False, "Payment ID is required."
         
+        if not reason or len(str(reason).strip()) < 5:
+            return False, "A clear reason (minimum 5 characters) is mandatory for reversing a financial transaction."
+        
         db = get_db()
         query = {"receipt_no": payment_id}
         try:
@@ -277,9 +293,6 @@ class PaymentService:
 
         if payment.get("is_reversed"):
             return False, "This payment transaction has already been reversed."
-
-        if not reason or not reason.strip():
-            return False, "A reason is mandatory for reversing a financial transaction."
 
         today_str = datetime.now().strftime("%Y-%m-%d")
         pay_id_str = str(payment["_id"])

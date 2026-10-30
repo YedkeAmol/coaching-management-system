@@ -260,12 +260,65 @@ def test_validation_rules():
     })
     assert ok is False
 
-    # Invalid phone
+    # Zero amount
+    ok, err, _ = PaymentService.record_payment({
+        "student_id": "STU-FAKE",
+        "amount": 0
+    })
+    assert ok is False
+
+    # Excessive amount (> ₹10 Lakh)
+    ok, err, _ = PaymentService.record_payment({
+        "student_id": "STU-FAKE",
+        "amount": 15000000
+    })
+    assert ok is False
+
+    # Invalid phone (too short)
     ok, err, _ = StudentService.create_student({
-        "full_name": "Invalid",
+        "full_name": "Invalid Student",
         "phone": "123"
     })
     assert ok is False
+
+    # Invalid phone (doesn't start with 6-9)
+    ok, err, _ = StudentService.create_student({
+        "full_name": "Invalid Student",
+        "phone": "2234567890"
+    })
+    assert ok is False
+
+    # Invalid name (empty or symbols only)
+    ok, err, _ = StudentService.create_student({
+        "full_name": "   ",
+        "phone": "9876543210"
+    })
+    assert ok is False
+
+    # Reversal reason too short (< 5 chars)
+    ok_rev, msg = PaymentService.reverse_payment("REC-202610-9999", reason="bad")
+    assert ok_rev is False
+    assert "minimum 5 characters" in msg
+
+    # Password cannot be identical to old password
+    ok_pw, msg_pw = AuthService.change_password("admin", "admin123", "admin123")
+    assert ok_pw is False
+    assert "different" in msg_pw
+
+    # Duplicate active phone enrollment
+    ok1, _, s1 = StudentService.create_student({
+        "full_name": "First Student",
+        "phone": "9811122233",
+        "batch_id": "BAT-01"
+    })
+    assert ok1 is True
+    ok2, err2, _ = StudentService.create_student({
+        "full_name": "Second Student",
+        "phone": "9811122233",
+        "batch_id": "BAT-01"
+    })
+    assert ok2 is False
+    assert "already actively enrolled" in err2
 
 # 13. Route Security & Authentication Check
 def test_protected_routes(client):
