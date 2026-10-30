@@ -1,10 +1,12 @@
 import os
 import logging
 from datetime import datetime, timezone
+from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from werkzeug.security import generate_password_hash
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
@@ -23,8 +25,8 @@ class DatabaseManager:
 
     def _init_connection(self):
         try:
-            # Short timeout to detect if local mongod is available
-            test_client = MongoClient(self.uri, serverSelectionTimeoutMS=1500)
+            # Timeout to detect if MongoDB cluster is available
+            test_client = MongoClient(self.uri, serverSelectionTimeoutMS=5000)
             test_client.admin.command('ping')
             self.client = test_client
             self.db = self.client[self.db_name]
