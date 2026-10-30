@@ -330,3 +330,23 @@ def test_protected_routes(client):
     # Unauthenticated API access should return 401
     res_api = client.get("/api/dashboard")
     assert res_api.status_code == 401
+
+# 14. Verify Seeded Sample Students & Financial Records
+def test_seeded_sample_students(isolated_db):
+    students_res = StudentService.get_students(status="Active")
+    assert students_res["total"] >= 4
+    names = [s["full_name"] for s in students_res["students"]]
+    assert "Aarav Sharma" in names
+    assert "Priya Patel" in names
+    assert "Rohan Deshmukh" in names
+    assert "Ananya Gupta" in names
+
+    # Verify payments exist for seeded students
+    payments_res = PaymentService.get_payments()
+    assert payments_res["total"] >= 5
+
+    # Verify batch enrollment counts
+    batches = BatchService.get_all_batches()
+    b1 = next(b for b in batches if b["batch_id"] == "BAT-01")
+    assert b1["student_count"] >= 2
+

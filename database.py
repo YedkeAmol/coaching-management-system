@@ -11,12 +11,14 @@ class DatabaseManager:
     _instance = None
 
     def __init__(self, uri=None, db_name=None):
+        global _db_manager
         self.uri = uri or os.getenv("MONGO_URI", "mongodb://localhost:27017/coaching_db")
         self.db_name = db_name or os.getenv("DB_NAME", "coaching_db")
         self.client = None
         self.db = None
         self.is_connected = False
         self.is_mock = False
+        _db_manager = self
         self._init_connection()
 
     def _init_connection(self):
@@ -180,8 +182,126 @@ class DatabaseManager:
                 ]
                 self.db.batches.insert_many(sample_batches)
 
+            # Seed sample students if none exist
+            if self.db.students.count_documents({}) == 0:
+                self._seed_sample_students()
+
         except Exception as e:
             logger.warning(f"Note on initial seeding: {e}")
+
+    def _seed_sample_students(self):
+        try:
+            from services.student_service import StudentService
+            from services.payment_service import PaymentService
+
+            students_data = [
+                {
+                    "full_name": "Aarav Sharma",
+                    "phone": "9820112233",
+                    "parent_name": "Rajesh Sharma",
+                    "parent_phone": "9820112230",
+                    "address": "B-42, Shanti Nagar, New Delhi",
+                    "batch_id": "BAT-01",
+                    "admission_date": "2026-08-01",
+                    "monthly_fee": 1500.0,
+                    "fee_due_day": 5,
+                    "notes": "Targeting CBSE Board 95%+ and NTSE Stage 1"
+                },
+                {
+                    "full_name": "Priya Patel",
+                    "phone": "9833445566",
+                    "parent_name": "Suresh Patel",
+                    "parent_phone": "9833445560",
+                    "address": "12/A, Navrangpura, Ahmedabad",
+                    "batch_id": "BAT-02",
+                    "admission_date": "2026-07-15",
+                    "monthly_fee": 2000.0,
+                    "fee_due_day": 5,
+                    "notes": "Preparing for JEE Main & State CET"
+                },
+                {
+                    "full_name": "Rohan Deshmukh",
+                    "phone": "9844556677",
+                    "parent_name": "Anand Deshmukh",
+                    "parent_phone": "9844556670",
+                    "address": "Flat 304, Shivneri Heights, Pune",
+                    "batch_id": "BAT-01",
+                    "admission_date": "2026-09-01",
+                    "monthly_fee": 1500.0,
+                    "fee_due_day": 10,
+                    "notes": "Regular student, needs focus on Geometry"
+                },
+                {
+                    "full_name": "Ananya Gupta",
+                    "phone": "9855667788",
+                    "parent_name": "Vikram Gupta",
+                    "parent_phone": "9855667780",
+                    "address": "Sector 14, Rohini, New Delhi",
+                    "batch_id": "BAT-03",
+                    "admission_date": "2026-08-10",
+                    "monthly_fee": 1800.0,
+                    "fee_due_day": 5,
+                    "notes": "NEET aspirant, strong in Organic Chemistry"
+                }
+            ]
+
+            created = []
+            for s in students_data:
+                ok, msg, stu = StudentService.create_student(s)
+                if ok and stu:
+                    created.append(stu)
+
+            if len(created) >= 4:
+                # 1. Aarav paid August & September (₹3000 total)
+                PaymentService.record_payment({
+                    "student_id": created[0]["student_id"],
+                    "amount": 3000.0,
+                    "payment_method": "UPI",
+                    "payment_date": "2026-09-05",
+                    "reference_no": "UPI-8291039481",
+                    "notes": "Combined August and September fee clearance"
+                })
+
+                # 2. Priya paid July+August (₹4000) and September+October+Advance (₹4500)
+                PaymentService.record_payment({
+                    "student_id": created[1]["student_id"],
+                    "amount": 4000.0,
+                    "payment_method": "Bank Transfer",
+                    "payment_date": "2026-08-04",
+                    "reference_no": "IMPS-7192830192",
+                    "notes": "July and August tuition fees"
+                })
+                PaymentService.record_payment({
+                    "student_id": created[1]["student_id"],
+                    "amount": 4500.0,
+                    "payment_method": "UPI",
+                    "payment_date": "2026-10-03",
+                    "reference_no": "UPI-9102830192",
+                    "notes": "September + October fees with ₹500 advance credit"
+                })
+
+                # 3. Rohan paid partial ₹1000 for September
+                PaymentService.record_payment({
+                    "student_id": created[2]["student_id"],
+                    "amount": 1000.0,
+                    "payment_method": "Cash",
+                    "payment_date": "2026-09-10",
+                    "notes": "Partial fee deposit by parent"
+                })
+
+                # 4. Ananya paid August & September (₹3600 total)
+                PaymentService.record_payment({
+                    "student_id": created[3]["student_id"],
+                    "amount": 3600.0,
+                    "payment_method": "UPI",
+                    "payment_date": "2026-09-08",
+                    "reference_no": "UPI-9810239481",
+                    "notes": "August and September fees paid online"
+                })
+
+            logger.info("Sample students, dues and payments seeded successfully.")
+        except Exception as e:
+            logger.warning(f"Note on student seeding: {e}")
 
     def get_db(self):
         return self.db
