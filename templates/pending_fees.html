@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Fees & Defaulters{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Pending Fees & Defaulter Tracking</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Identify overdue tuition balances and initiate parent communication</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('export_pending_csv') }}" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-lg shadow-sm flex items-center space-x-1.5">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Download Defaulters CSV</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters row -->
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div class="relative w-full md:w-80">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="search" class="w-4 h-4"></i>
+            </div>
+            <input type="text" id="defSearch" placeholder="Search student name, phone..." onkeyup="if(event.key === 'Enter') loadDefaulters()"
+                class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <select id="defBatch" onchange="loadDefaulters()" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none">
+                <option value="">All Batches</option>
+                {% for b in batches %}
+                <option value="{{ b.batch_id }}">{{ b.batch_name }}</option>
+                {% endfor %}
+            </select>
+            <select id="defDays" onchange="loadDefaulters()" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none">
+                <option value="0">All Unpaid Dues</option>
+                <option value="15">&gt; 15 Days Overdue</option>
+                <option value="30">&gt; 30 Days Overdue</option>
+                <option value="60">&gt; 60 Days (Severe Defaulters)</option>
+            </select>
+            <button onclick="loadDefaulters()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow">Filter</button>
+        </div>
+    </div>
+
+    <!-- Defaulters Table -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th class="p-3.5 pl-5">Student</th>
+                        <th class="p-3.5">Batch</th>
+                        <th class="p-3.5">Parent Contact</th>
+                        <th class="p-3.5">Oldest Due Date</th>
+                        <th class="p-3.5 text-center">Days Overdue</th>
+                        <th class="p-3.5 text-right">Total Pending</th>
+                        <th class="p-3.5 text-center">Severity</th>
+                        <th class="p-3.5 pr-5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="defaultersTableBody" class="divide-y divide-slate-100">
+                    <tr>
+                        <td colspan="8" class="p-8 text-center text-slate-400">Loading defaulters list...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadDefaulters() {
+        const batch = document.getElementById('defBatch').value;
+        const minDays = document.getElementById('defDays').value;
+        const search = document.getElementById('defSearch').value.trim();
+
+        const res = await fetchJson(`/api/fees/pending?batch_id=${encodeURIComponent(batch)}&min_days=${minDays}&search=${encodeURIComponent(search)}`);
+        
+        const tbody = document.getElementById('defaultersTableBody');
+        if (!res.success || !res.data.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">No overdue fee defaulters found! All student accounts are in good standing.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = res.data.map(d => `
+            <tr class="hover:bg-slate-50/80 transition">
+                <td class="p-3.5 pl-5">
+                    <a href="/students/${d.student_id}" class="font-medium text-slate-900 hover:text-blue-600 block">
+                        ${d.student_name}
+                    </a>
+                    <span class="text-[10px] font-mono text-slate-400">${d.student_id} &bull; ${d.phone}</span>
+                </td>
+                <td class="p-3.5 text-slate-600 truncate max-w-[140px]">${d.batch_name}</td>
+                <td class="p-3.5">
+                    <div class="text-slate-800">${d.parent_name}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${d.parent_phone}</div>
+                </td>
+                <td class="p-3.5 text-slate-600">${d.formatted_oldest_due_date}</td>
+                <td class="p-3.5 text-center">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${d.days_overdue > 60 ? 'bg-rose-100 text-rose-700' : (d.days_overdue > 30 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700')}">
+                        ${d.days_overdue} days
+                    </span>
+                </td>
+                <td class="p-3.5 text-right font-extrabold text-rose-600">
+                    ₹${(d.total_pending_paise / 100).toFixed(2)}
+                </td>
+                <td class="p-3.5 text-center">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        ${d.status}
+                    </span>
+                </td>
+                <td class="p-3.5 pr-5 text-right space-x-1">
+                    <a href="/students/${d.student_id}" class="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded font-medium transition text-[11px]">
+                        Collect
+                    </a>
+                </td>
+            </tr>
+        `).join('');
+
+        lucide.createIcons();
+    }
+
+    loadDefaulters();
+</script>
+{% endblock %}

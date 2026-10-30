@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly Fees{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Monthly Fee Management</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Track and collect tuition fees month-by-month across all active batches</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-slate-600">Month:</span>
+            <input type="month" id="monthPicker" value="{{ current_month }}" onchange="loadMonthlyFees()"
+                class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+    </div>
+
+    <!-- Filters row -->
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div class="relative w-full md:w-80">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="search" class="w-4 h-4"></i>
+            </div>
+            <input type="text" id="feeSearch" placeholder="Search student name, ID..." onkeyup="if(event.key === 'Enter') loadMonthlyFees()"
+                class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <select id="feeBatchFilter" onchange="loadMonthlyFees()" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none">
+                <option value="">All Batches</option>
+                {% for b in batches %}
+                <option value="{{ b.batch_id }}">{{ b.batch_name }}</option>
+                {% endfor %}
+            </select>
+            <select id="feeStatusFilter" onchange="loadMonthlyFees()" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none">
+                <option value="">All Statuses</option>
+                <option value="Paid">Paid</option>
+                <option value="Partially Paid">Partially Paid</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Pending">Pending</option>
+            </select>
+            <button onclick="loadMonthlyFees()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow">Apply Filter</button>
+        </div>
+    </div>
+
+    <!-- Monthly Grid Table -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th class="p-3.5 pl-5">Student</th>
+                        <th class="p-3.5">Batch</th>
+                        <th class="p-3.5">Due Date</th>
+                        <th class="p-3.5 text-right">Fee Due</th>
+                        <th class="p-3.5 text-right">Paid</th>
+                        <th class="p-3.5 text-right">Balance</th>
+                        <th class="p-3.5 text-center">Status</th>
+                        <th class="p-3.5 pr-5 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="feeTableBody" class="divide-y divide-slate-100">
+                    <tr>
+                        <td colspan="8" class="p-8 text-center text-slate-400">Loading monthly fee records...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadMonthlyFees() {
+        const month = document.getElementById('monthPicker').value;
+        const batch = document.getElementById('feeBatchFilter').value;
+        const status = document.getElementById('feeStatusFilter').value;
+        const search = document.getElementById('feeSearch').value.trim();
+
+        const res = await fetchJson(`/api/fees/monthly?month=${month}&batch_id=${encodeURIComponent(batch)}&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`);
+        
+        const tbody = document.getElementById('feeTableBody');
+        if (!res.success || !res.data.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">No fee records found for ${month}.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = res.data.map(r => `
+            <tr class="hover:bg-slate-50/80 transition">
+                <td class="p-3.5 pl-5">
+                    <a href="/students/${r.student_id}" class="font-medium text-slate-900 hover:text-blue-600 block">
+                        ${r.student_name}
+                    </a>
+                    <span class="text-[10px] font-mono text-slate-400">${r.student_id}</span>
+                </td>
+                <td class="p-3.5 text-slate-600 truncate max-w-[140px]">${r.batch_name}</td>
+                <td class="p-3.5 text-slate-600">${r.formatted_due_date}</td>
+                <td class="p-3.5 text-right font-medium text-slate-900">₹${r.amount_due_rupees.toFixed(2)}</td>
+                <td class="p-3.5 text-right font-medium text-emerald-600">₹${r.paid_amount_rupees.toFixed(2)}</td>
+                <td class="p-3.5 text-right font-bold ${r.balance_rupees > 0 ? 'text-rose-600' : 'text-slate-400'}">
+                    ₹${r.balance_rupees.toFixed(2)}
+                </td>
+                <td class="p-3.5 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold 
+                        ${r.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                         (r.status === 'Partially Paid' ? 'bg-amber-100 text-amber-700' : 
+                         (r.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'))}">
+                        ${r.status}
+                    </span>
+                </td>
+                <td class="p-3.5 pr-5 text-right">
+                    ${r.balance_rupees > 0 ? `
+                        <button onclick="collectFee('${r.student_id}', '${r.student_name}', ${r.balance_rupees})" 
+                            class="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded font-medium transition text-[11px]">
+                            Collect
+                        </button>
+                    ` : `<span class="text-slate-400 text-[11px]">Paid &check;</span>`}
+                </td>
+            </tr>
+        `).join('');
+
+        lucide.createIcons();
+    }
+
+    function collectFee(studentId, studentName, balance) {
+        const html = `
+            <form onsubmit="handleFeePayment(event)" class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Student</label>
+                    <div class="p-2.5 bg-slate-100 rounded-lg text-slate-900 font-medium">
+                        ${studentName} (<span class="font-mono text-blue-600">${studentId}</span>)
+                    </div>
+                    <input type="hidden" id="modalStuId" value="${studentId}">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Amount to Collect (₹) *</label>
+                        <input type="number" step="0.01" min="1" id="modalAmt" required value="${balance}"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Payment Method</label>
+                        <select id="modalMeth" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="UPI">UPI / GPay / PhonePe</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Bank Transfer">Bank Transfer / IMPS</option>
+                            <option value="Other">Other / Cheque</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Payment Date</label>
+                        <input type="date" id="modalDate" value="{{ today_date }}"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Reference No</label>
+                        <input type="text" id="modalRef" placeholder="UPI Reference..."
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow">Confirm & Print Receipt</button>
+                </div>
+            </form>
+        `;
+        openModal('Collect Tuition Fee', html);
+    }
+
+    async function handleFeePayment(e) {
+        e.preventDefault();
+        const payload = {
+            student_id: document.getElementById('modalStuId').value,
+            amount: parseFloat(document.getElementById('modalAmt').value),
+            payment_method: document.getElementById('modalMeth').value,
+            payment_date: document.getElementById('modalDate').value,
+            reference_no: document.getElementById('modalRef').value.trim()
+        };
+
+        const res = await fetchJson('/api/payments', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.success) {
+            closeModal();
+            window.open('/receipt/' + res.data.receipt_no, '_blank');
+            loadMonthlyFees();
+        } else {
+            alert('Error: ' + res.error);
+        }
+    }
+
+    loadMonthlyFees();
+</script>
+{% endblock %}

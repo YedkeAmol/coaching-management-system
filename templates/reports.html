@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Analytics{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Financial Reports & Exports</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Comprehensive audit reports, batch-wise earnings & exportable CSV data</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('export_collection_csv') }}" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow flex items-center space-x-1.5">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Download Collection CSV</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Batch-wise Revenue Summary Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Batch-wise Revenue & Enrollment Summary</h3>
+                <p class="text-xs text-slate-400">Total expected monthly run-rate vs collected revenue by batch</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th class="p-3.5 pl-5">Batch ID</th>
+                        <th class="p-3.5">Batch Name</th>
+                        <th class="p-3.5">Course</th>
+                        <th class="p-3.5 text-center">Active Students</th>
+                        <th class="p-3.5 text-right">Expected Monthly Run-rate</th>
+                        <th class="p-3.5 text-right">Total Collected</th>
+                        <th class="p-3.5 pr-5 text-right">Unpaid Outstanding</th>
+                    </tr>
+                </thead>
+                <tbody id="batchReportBody" class="divide-y divide-slate-100">
+                    <tr><td colspan="7" class="p-6 text-center text-slate-400">Loading batch summary...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Admissions Report Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Recent Student Admissions Log</h3>
+                <p class="text-xs text-slate-400">Chronological list of all enrolled students and their assigned tuition plans</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th class="p-3.5 pl-5">Student ID</th>
+                        <th class="p-3.5">Student Name</th>
+                        <th class="p-3.5">Batch</th>
+                        <th class="p-3.5">Phone</th>
+                        <th class="p-3.5">Admission Date</th>
+                        <th class="p-3.5 text-right">Monthly Fee</th>
+                        <th class="p-3.5 pr-5 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="admissionsReportBody" class="divide-y divide-slate-100">
+                    <tr><td colspan="7" class="p-6 text-center text-slate-400">Loading admissions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadReports() {
+        // Load Batch Summary
+        const bRes = await fetchJson('/api/reports/batch-summary');
+        if (bRes.success && bRes.data.length) {
+            document.getElementById('batchReportBody').innerHTML = bRes.data.map(b => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="p-3.5 pl-5 font-mono font-bold text-blue-600">${b.batch_id}</td>
+                    <td class="p-3.5 font-medium text-slate-900">${b.batch_name}</td>
+                    <td class="p-3.5 text-slate-600">${b.course_name}</td>
+                    <td class="p-3.5 text-center font-bold text-slate-800">${b.student_count}</td>
+                    <td class="p-3.5 text-right font-medium text-slate-900">${b.formatted_monthly_expected}</td>
+                    <td class="p-3.5 text-right font-bold text-emerald-600">${b.formatted_total_collected}</td>
+                    <td class="p-3.5 pr-5 text-right font-bold ${b.outstanding_paise > 0 ? 'text-rose-600' : 'text-slate-400'}">${b.formatted_outstanding}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Load Admissions
+        const aRes = await fetchJson('/api/reports/admissions');
+        if (aRes.success && aRes.data.length) {
+            document.getElementById('admissionsReportBody').innerHTML = aRes.data.map(a => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="p-3.5 pl-5 font-mono text-blue-600 font-medium">
+                        <a href="/students/${a.student_id}" class="hover:underline">${a.student_id}</a>
+                    </td>
+                    <td class="p-3.5 font-medium text-slate-900">${a.full_name}</td>
+                    <td class="p-3.5 text-slate-600">${a.batch_name}</td>
+                    <td class="p-3.5 font-mono text-slate-600">${a.phone}</td>
+                    <td class="p-3.5 text-slate-600">${a.admission_date}</td>
+                    <td class="p-3.5 text-right font-medium text-slate-900">${a.formatted_monthly_fee}</td>
+                    <td class="p-3.5 pr-5 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${a.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">
+                            ${a.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    loadReports();
+</script>
+{% endblock %}

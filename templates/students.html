@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Students{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Student Directory</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Manage admissions, batch enrollments & individual tuition fee profiles</p>
+        </div>
+        <button onclick="openAddStudentModal()" class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-md shadow-blue-500/20 transition">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            <span>New Admission</span>
+        </button>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div class="relative w-full md:w-96">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="search" class="w-4 h-4"></i>
+            </div>
+            <input type="text" id="searchInput" placeholder="Search by name, student ID, phone..."
+                class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <select id="batchFilter" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none">
+                <option value="All">All Batches</option>
+                {% for b in batches %}
+                <option value="{{ b.batch_id }}">{{ b.batch_name }}</option>
+                {% endfor %}
+            </select>
+            <select id="statusFilter" class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none">
+                <option value="Active">Active</option>
+                <option value="Archived">Archived</option>
+                <option value="All">All Statuses</option>
+            </select>
+            <button onclick="loadStudents(1)" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow">Filter</button>
+        </div>
+    </div>
+
+    <!-- Students Table -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th class="p-3.5 pl-5">Student ID</th>
+                        <th class="p-3.5">Full Name</th>
+                        <th class="p-3.5">Batch</th>
+                        <th class="p-3.5">Phone</th>
+                        <th class="p-3.5 text-right">Monthly Fee</th>
+                        <th class="p-3.5 text-right">Pending Dues</th>
+                        <th class="p-3.5 text-center">Status</th>
+                        <th class="p-3.5 pr-5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="studentsTableBody" class="divide-y divide-slate-100">
+                    <tr>
+                        <td colspan="8" class="p-8 text-center text-slate-400">Loading student directory...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination Controls -->
+        <div class="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div id="pageInfo">Showing 0 students</div>
+            <div class="flex items-center space-x-2" id="paginationBtns"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+
+    async function loadStudents(page = 1) {
+        currentPage = page;
+        const search = document.getElementById('searchInput').value;
+        const batch = document.getElementById('batchFilter').value;
+        const status = document.getElementById('statusFilter').value;
+
+        const res = await fetchJson(`/api/students?page=${page}&search=${encodeURIComponent(search)}&batch_id=${encodeURIComponent(batch)}&status=${encodeURIComponent(status)}`);
+        
+        const tbody = document.getElementById('studentsTableBody');
+        if (!res.success || !res.data.students.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">No students found matching your criteria.</td></tr>`;
+            document.getElementById('pageInfo').innerText = 'Showing 0 students';
+            document.getElementById('paginationBtns').innerHTML = '';
+            return;
+        }
+
+        const data = res.data;
+        document.getElementById('pageInfo').innerText = `Showing page ${data.page} of ${data.total_pages} (${data.total} total students)`;
+
+        tbody.innerHTML = data.students.map(s => `
+            <tr class="hover:bg-slate-50/80 transition">
+                <td class="p-3.5 pl-5 font-mono font-medium text-blue-600">
+                    <a href="/students/${s.student_id}" class="hover:underline flex items-center space-x-1">
+                        <span>${s.student_id}</span>
+                        <i data-lucide="external-link" class="w-3 h-3 text-slate-400"></i>
+                    </a>
+                </td>
+                <td class="p-3.5">
+                    <div class="font-medium text-slate-900">${s.full_name}</div>
+                    <div class="text-[10px] text-slate-400">${s.parent_name ? 'Guardian: ' + s.parent_name : ''}</div>
+                </td>
+                <td class="p-3.5 text-slate-600">${s.batch_name}</td>
+                <td class="p-3.5 font-mono text-slate-600">${s.phone}</td>
+                <td class="p-3.5 text-right font-medium text-slate-900">₹${s.monthly_fee_rupees.toFixed(2)}</td>
+                <td class="p-3.5 text-right font-bold ${s.total_pending_paise > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                    ${s.formatted_pending_fee}
+                </td>
+                <td class="p-3.5 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${s.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">
+                        ${s.status}
+                    </span>
+                </td>
+                <td class="p-3.5 pr-5 text-right space-x-1">
+                    <a href="/students/${s.student_id}" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-medium transition">Profile</a>
+                    <button onclick="quickCollect('${s.student_id}', ${s.total_pending_rupees})" class="px-2 py-1 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 rounded text-[11px] font-medium transition">Pay</button>
+                    <button onclick="deleteStudent('${s.student_id}', '${s.full_name}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 rounded text-[11px] font-medium transition">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+
+        lucide.createIcons();
+
+        // Render Pagination buttons
+        let pagHtml = '';
+        if (data.page > 1) {
+            pagHtml += `<button onclick="loadStudents(${data.page - 1})" class="px-3 py-1 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50">&larr; Prev</button>`;
+        }
+        if (data.page < data.total_pages) {
+            pagHtml += `<button onclick="loadStudents(${data.page + 1})" class="px-3 py-1 bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50">Next &rarr;</button>`;
+        }
+        document.getElementById('paginationBtns').innerHTML = pagHtml;
+    }
+
+    function openAddStudentModal() {
+        const batchOptions = `{% for b in batches %}<option value="{{ b.batch_id }}" data-fee="{{ b.default_monthly_fee_rupees }}">{{ b.batch_name }} (₹{{ b.default_monthly_fee_rupees }})</option>{% endfor %}`;
+        const html = `
+            <form id="addStudentForm" onsubmit="handleAddStudent(event)" class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Full Name *</label>
+                    <input type="text" id="stuName" required placeholder="e.g. Aarav Sharma"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Student Phone *</label>
+                        <input type="tel" id="stuPhone" required placeholder="9876543201"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Admission Date</label>
+                        <input type="date" id="stuAdmDate" value="{{ today_date }}"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Parent / Guardian Name</label>
+                        <input type="text" id="stuParentName" placeholder="e.g. Rajesh Sharma"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Parent Phone</label>
+                        <input type="tel" id="stuParentPhone" placeholder="9876543202"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Batch Assignment *</label>
+                        <select id="stuBatch" onchange="updateBatchFee()" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                            ${batchOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Monthly Fee (₹) *</label>
+                        <input type="number" step="0.01" id="stuFee" required placeholder="1500"
+                            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Address / Residence</label>
+                    <input type="text" id="stuAddress" placeholder="e.g. B-42, Mayur Vihar, New Delhi"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Academic Notes / Goals</label>
+                    <input type="text" id="stuNotes" placeholder="e.g. Target 95% in Board Exams"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="pt-3 flex justify-end space-x-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" id="addStuBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow">Confirm Admission</button>
+                </div>
+            </form>
+        `;
+        openModal('Student Admission', html);
+        updateBatchFee();
+    }
+
+    function updateBatchFee() {
+        const batchSelect = document.getElementById('stuBatch');
+        if (batchSelect && batchSelect.selectedOptions.length) {
+            const defaultFee = batchSelect.selectedOptions[0].getAttribute('data-fee');
+            if (defaultFee) {
+                document.getElementById('stuFee').value = defaultFee;
+            }
+        }
+    }
+
+    async function handleAddStudent(e) {
+        e.preventDefault();
+        const btn = document.getElementById('addStuBtn');
+        btn.disabled = true;
+        btn.innerText = 'Enrolling...';
+
+        const payload = {
+            full_name: document.getElementById('stuName').value.trim(),
+            phone: document.getElementById('stuPhone').value.trim(),
+            admission_date: document.getElementById('stuAdmDate').value,
+            parent_name: document.getElementById('stuParentName').value.trim(),
+            parent_phone: document.getElementById('stuParentPhone').value.trim(),
+            batch_id: document.getElementById('stuBatch').value,
+            monthly_fee: parseFloat(document.getElementById('stuFee').value),
+            address: document.getElementById('stuAddress').value.trim(),
+            notes: document.getElementById('stuNotes').value.trim()
+        };
+
+        const res = await fetchJson('/api/students', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        if (res.success) {
+            closeModal();
+            loadStudents(1);
+        } else {
+            alert('Error: ' + (res.error || 'Failed to create student'));
+            btn.disabled = false;
+            btn.innerText = 'Confirm Admission';
+        }
+    }
+
+    async function deleteStudent(studentId, name) {
+        if (!confirm(`Are you sure you want to delete/archive student "${name}" (${studentId})?`)) return;
+        const res = await fetchJson(`/api/students/${studentId}`, { method: 'DELETE' });
+        if (res.success) {
+            alert(res.message);
+            loadStudents(currentPage);
+        } else {
+            alert('Error: ' + res.error);
+        }
+    }
+
+    function quickCollect(studentId, pendingRupees) {
+        window.location.href = `/students/${studentId}`;
+    }
+
+    // Load initial table on page load
+    loadStudents(1);
+</script>
+{% endblock %}

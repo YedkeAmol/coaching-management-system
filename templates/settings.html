@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Academy Settings{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">System & Institute Settings</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Customize coaching institute profile, default tuition fees & admin security</p>
+    </div>
+
+    <!-- Institute Profile Form -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="text-base font-bold text-slate-900 mb-1">Institute Information</h2>
+        <p class="text-xs text-slate-400 mb-6">These details appear on official student fee receipts and printable invoices</p>
+
+        <form id="settingsForm" onsubmit="handleSettingsSave(event)" class="space-y-4 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Institute / Academy Name *</label>
+                    <input type="text" id="instName" required value="{{ settings.institute_name }}"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Contact Phone Number *</label>
+                    <input type="text" id="instPhone" required value="{{ settings.contact_number }}"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Official Email Address</label>
+                    <input type="email" id="instEmail" value="{{ settings.email }}"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Default Monthly Fee (₹)</label>
+                    <input type="number" step="0.01" id="instDefaultFee" value="{{ settings.default_monthly_fee_rupees }}"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Default Fee Due Day (1 - 28)</label>
+                    <input type="number" min="1" max="28" id="instDueDay" value="{{ settings.default_fee_due_day }}"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Accepted Payment Methods (comma separated)</label>
+                    <input type="text" id="instMethods" value="{{ settings.payment_methods|join(', ') }}"
+                        class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Institute Address</label>
+                <textarea id="instAddress" rows="2"
+                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">{{ settings.address }}</textarea>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+                <button type="submit" id="saveSetBtn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow">
+                    Save Institute Profile
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Security & Password Change -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="text-base font-bold text-slate-900 mb-1">Administrator Password</h2>
+        <p class="text-xs text-slate-400 mb-6">Update the master administrative credentials used for system access</p>
+
+        <form id="pwForm" onsubmit="handlePwChange(event)" class="space-y-4 text-xs max-w-md">
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Current Password *</label>
+                <input type="password" id="curPw" required placeholder="••••••••"
+                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">New Password (min 6 characters) *</label>
+                <input type="password" id="newPw" required minlength="6" placeholder="••••••••"
+                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div class="pt-2">
+                <button type="submit" id="savePwBtn" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg shadow">
+                    Update Password
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function handleSettingsSave(e) {
+        e.preventDefault();
+        const btn = document.getElementById('saveSetBtn');
+        btn.disabled = true;
+        btn.innerText = 'Saving...';
+
+        const payload = {
+            institute_name: document.getElementById('instName').value.trim(),
+            contact_number: document.getElementById('instPhone').value.trim(),
+            email: document.getElementById('instEmail').value.trim(),
+            address: document.getElementById('instAddress').value.trim(),
+            default_monthly_fee: parseFloat(document.getElementById('instDefaultFee').value),
+            default_fee_due_day: parseInt(document.getElementById('instDueDay').value),
+            payment_methods: document.getElementById('instMethods').value.split(',').map(m => m.trim()).filter(Boolean)
+        };
+
+        const res = await fetchJson('/api/settings', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        alert(res.message || res.error);
+        btn.disabled = false;
+        btn.innerText = 'Save Institute Profile';
+    }
+
+    async function handlePwChange(e) {
+        e.preventDefault();
+        const btn = document.getElementById('savePwBtn');
+        btn.disabled = true;
+        btn.innerText = 'Updating...';
+
+        const payload = {
+            current_password: document.getElementById('curPw').value,
+            new_password: document.getElementById('newPw').value
+        };
+
+        const res = await fetchJson('/api/settings/password', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        alert(res.message || res.error);
+        if (res.success) {
+            document.getElementById('pwForm').reset();
+        }
+        btn.disabled = false;
+        btn.innerText = 'Update Password';
+    }
+</script>
+{% endblock %}
