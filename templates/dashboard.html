@@ -215,7 +215,7 @@
                 labels: {{ data.collection_trend.labels | tojson }},
                 datasets: [{
                     label: 'Collection (₹)',
-                    data: {{ data.collection_trend.values | tojson }},
+                    data: {{ data.collection_trend.amounts | tojson }},
                     backgroundColor: '#3b82f6',
                     borderRadius: 6,
                     maxBarThickness: 32
@@ -245,7 +245,7 @@
             data: {
                 labels: {{ data.payment_methods.labels | tojson }},
                 datasets: [{
-                    data: {{ data.payment_methods.values | tojson }},
+                    data: {{ data.payment_methods.amounts | tojson }},
                     backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'],
                     borderWidth: 0
                 }]

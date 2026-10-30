@@ -95,11 +95,13 @@ class ReportService:
             "recent_defaulters": defaulters,
             "collection_trend": {
                 "labels": trend_labels,
-                "values": trend_values
+                "values": trend_values,
+                "amounts": trend_values
             },
             "payment_methods": {
                 "labels": list(method_counts.keys()),
-                "values": list(method_counts.values())
+                "values": list(method_counts.values()),
+                "amounts": list(method_counts.values())
             }
         }
 
